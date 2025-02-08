@@ -1,266 +1,299 @@
-  // Canvas和上下文初始化
-  const canvas = document.getElementById('mandelbrot');
-  const ctx = canvas.getContext('2d');
+// 全局变量
+let canvas = document.getElementById('mandelbrot');
+let ctx = canvas.getContext('2d');
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+let currentX = -0.5;
+let currentY = 0;
+let zoomLevel = 1;
+let imageData;
 
-  // BigNumber配置
-  BigNumber.config({ 
-    DECIMAL_PLACES: 40,
-    ROUNDING_MODE: BigNumber.ROUND_HALF_UP,
-    EXPONENTIAL_AT: [-40, 40]
-  });
-
-  // 响应式画布大小设置
-  function resizeCanvas() {
-    const maxWidth = Math.min(800, window.innerWidth - 20);
-    const aspectRatio = 3/4;
-    canvas.width = maxWidth;
-    canvas.height = maxWidth * aspectRatio;
-  }
-
-  // 初始化时和窗口改变时调整画布大小
-  resizeCanvas();
-  window.addEventListener('resize', () => {
-    resizeCanvas();
-    draw();
-  });
-
-  // 视图范围初始化
-  let xMin = new BigNumber(-2);
-  let xMax = new BigNumber(1);
-  let yMin = new BigNumber(-1.5);
-  let yMax = new BigNumber(1.5);
-
-  // 控制参数
-  let zoomLevel = 1;
-  let zoomFactor = 2;
-  let maxIter = 100;
-  let precisionControlEnabled = true;
-  let usePrecisionMode = false;
-
-  // UI控制函数
-  function updatePrecisionControl() {
-    precisionControlEnabled = document.getElementById('precisionControl').checked;
-    draw();
-  }
-
-  function updateCalculationMode() {
-    usePrecisionMode = document.getElementById('calculationMode').value === 'precision';
-    document.getElementById('currentMode').textContent = 
-      usePrecisionMode ? '高精度模式' : '标准模式';
-    draw();
-  }
-
-  function updateIterations() {
-    const input = document.getElementById('iterInput');
-    maxIter = Math.min(Math.max(parseInt(input.value) || 100, 1), 1000);
-    input.value = maxIter;
-    draw();
-  }
-
-  function updateInfo() {
-    const centerX = xMax.plus(xMin).div(2);
-    const centerY = yMax.plus(yMin).div(2);
-    const range = xMax.minus(xMin);
+// 初始化设置
+function initialize() {
+    // 设置画布大小
+    canvas.width = 800;
+    canvas.height = 600;
     
-    document.getElementById('zoomLevel').textContent = `${zoomLevel.toFixed(1)}x`;
-    document.getElementById('centerCoord').textContent = 
-      `(${centerX.toString()}, ${centerY.toString()})`;
-    document.getElementById('precision').textContent = 
-      `${Math.abs(Math.log10(range.toNumber())).toFixed(2)} 位`;
-  }
-
-  function updateZoomFactor() {
-    zoomFactor = parseFloat(document.getElementById('zoomFactor').value);
-  }
-
-  // 标准模式曼德布罗集计算
-  function mandelbrotNormal(x0, y0) {
-    let x = 0;
-    let y = 0;
-    let iter = 0;
+    // 添加事件监听器
+    setupEventListeners();
     
-    while (x*x + y*y <= 4 && iter < maxIter) {
-      const xTemp = x*x - y*y + x0;
-      y = 2*x*y + y0;
-      x = xTemp;
-      iter++;
-    }
+    // 初始渲染
+    render();
     
-    return iter;
-  }
+    // 更新状态显示
+    updateStatus();
+}
 
-  // 高精度模式曼德布罗集计算
-  function mandelbrotPrecision(x0, y0) {
-    let x = new BigNumber(0);
-    let y = new BigNumber(0);
-    let iter = 0;
+// 设置事件监听器
+function setupEventListeners() {
+    // 鼠标事件
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('wheel', handleWheel);
     
-    const four = new BigNumber(4);
-    const two = new BigNumber(2);
+    // 触摸事件
+    canvas.addEventListener('touchstart', handleTouchStart);
+    canvas.addEventListener('touchmove', handleTouchMove);
+    canvas.addEventListener('touchend', handleTouchEnd);
     
-    while (x.times(x).plus(y.times(y)).lte(four) && iter < maxIter) {
-      const xTemp = x.times(x).minus(y.times(y)).plus(x0);
-      y = two.times(x).times(y).plus(y0);
-      x = xTemp;
-      iter++;
-    }
+    // 控制面板事件
+    document.getElementById('calculationMode').addEventListener('change', handleModeChange);
+    document.getElementById('zoomFactor').addEventListener('change', handleZoomFactorChange);
+    document.getElementById('iterInput').addEventListener('change', handleIterationChange);
+    document.getElementById('precisionControl').addEventListener('change', handlePrecisionChange);
+}
+
+// 渲染曼德博集合
+function render() {
+    const maxIter = parseInt(document.getElementById('iterInput').value);
+    const isPrecisionMode = document.getElementById('calculationMode').value === 'precision';
     
-    return iter;
-  }
-
-  // 颜色转换函数
-  function hslToRgb(h, s, l) {
-    let r, g, b;
-
-    if (s === 0) {
-      r = g = b = l;
-    } else {
-      const hue2rgb = (p, q, t) => {
-        if (t < 0) t += 1;
-        if (t > 1) t -= 1;
-        if (t < 1/6) return p + (q - p) * 6 * t;
-        if (t < 1/2) return q;
-        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-        return p;
-      };
-
-      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-      const p = 2 * l - q;
-      r = hue2rgb(p, q, h + 1/3);
-      g = hue2rgb(p, q, h);
-      b = hue2rgb(p, q, h - 1/3);
-    }
-
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
-  }
-
-  // 绘制函数
-  function draw() {
-    const imageData = ctx.createImageData(canvas.width, canvas.height);
-    const data = imageData.data;
+    imageData = ctx.createImageData(canvas.width, canvas.height);
     
-    // 检查数值范围是否过小（仅在启用精度控制且使用标准模式时）
-    const range = xMax.minus(xMin);
-    if (!usePrecisionMode && precisionControlEnabled && range.lt(new BigNumber('1e-13'))) {
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#000';
-      ctx.font = '16px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText('请切换到高精度模式以继续缩放', canvas.width/2, canvas.height/2);
-      updateInfo();
-      return;
-    }
-    
-    for (let i = 0; i < canvas.width; i++) {
-      for (let j = 0; j < canvas.height; j++) {
-        let x, y;
-        if (usePrecisionMode) {
-          x = xMin.plus(xMax.minus(xMin).times(i).div(canvas.width));
-          y = yMin.plus(yMax.minus(yMin).times(j).div(canvas.height));
-        } else {
-          x = xMin.toNumber() + (xMax.toNumber() - xMin.toNumber()) * i / canvas.width;
-          y = yMin.toNumber() + (yMax.toNumber() - yMin.toNumber()) * j / canvas.height;
+    for(let x = 0; x < canvas.width; x++) {
+        for(let y = 0; y < canvas.height; y++) {
+            let zx = mapToReal(x, canvas.width, currentX, zoomLevel);
+            let zy = mapToImaginary(y, canvas.height, currentY, zoomLevel);
+            
+            let iteration = calculatePoint(zx, zy, maxIter, isPrecisionMode);
+            
+            setPixel(imageData, x, y, iteration, maxIter);
         }
-        
-        const iter = usePrecisionMode ? 
-          mandelbrotPrecision(x, y) : 
-          mandelbrotNormal(x, y);
-        
-        const idx = (i + j * canvas.width) * 4;
-        
-        if (iter === maxIter) {
-          data[idx] = 0;
-          data[idx + 1] = 0;
-          data[idx + 2] = 0;
-        } else {
-          const hue = (iter / maxIter) * 360;
-          const rgb = hslToRgb(hue/360, 1, 0.5);
-          data[idx] = rgb[0];
-          data[idx + 1] = rgb[1];
-          data[idx + 2] = rgb[2];
-        }
-        data[idx + 3] = 255;
-      }
     }
     
     ctx.putImageData(imageData, 0, 0);
-    updateInfo();
-  }
+    updateStatus();
+}
 
-  // 缩放功能
-  function zoom(event) {
-    const rect = canvas.getBoundingClientRect();
-    const x = (event.clientX || event.touches[0].clientX) - rect.left;
-    const y = (event.clientY || event.touches[0].clientY) - rect.top;
+// 计算单个点
+function calculatePoint(x0, y0, maxIter, isPrecisionMode) {
+    if (isPrecisionMode) {
+        return calculatePointPrecision(x0, y0, maxIter);
+    }
     
-    const zoomX = xMin.plus(xMax.minus(xMin).times(x).div(canvas.width));
-    const zoomY = yMin.plus(yMax.minus(yMin).times(y).div(canvas.height));
+    let x = 0;
+    let y = 0;
+    let iteration = 0;
     
-    const newWidth = xMax.minus(xMin).div(zoomFactor);
-    const newHeight = yMax.minus(yMin).div(zoomFactor);
+    while (x*x + y*y <= 4 && iteration < maxIter) {
+        let xtemp = x*x - y*y + x0;
+        y = 2*x*y + y0;
+        x = xtemp;
+        iteration++;
+    }
     
-    xMin = zoomX.minus(newWidth.div(2));
-    xMax = zoomX.plus(newWidth.div(2));
-    yMin = zoomY.minus(newHeight.div(2));
-    yMax = zoomY.plus(newHeight.div(2));
-    
-    zoomLevel *= zoomFactor;
-    draw();
-  }
+    return iteration;
+}
 
-  function zoomOut() {
-    const centerX = xMax.plus(xMin).div(2);
-    const centerY = yMax.plus(yMin).div(2);
-    const width = xMax.minus(xMin).times(zoomFactor);
-    const height = yMax.minus(yMin).times(zoomFactor);
+// 高精度计算
+function calculatePointPrecision(x0, y0, maxIter) {
+    let x = new BigNumber(0);
+    let y = new BigNumber(0);
+    let x0Big = new BigNumber(x0);
+    let y0Big = new BigNumber(y0);
+    let iteration = 0;
     
-    xMin = centerX.minus(width.div(2));
-    xMax = centerX.plus(width.div(2));
-    yMin = centerY.minus(height.div(2));
-    yMax = centerY.plus(height.div(2));
+    while (x.times(x).plus(y.times(y)).lte(4) && iteration < maxIter) {
+        let xtemp = x.times(x).minus(y.times(y)).plus(x0Big);
+        y = x.times(y).times(2).plus(y0Big);
+        x = xtemp;
+        iteration++;
+    }
     
-    zoomLevel /= zoomFactor;
-    draw();
-  }
+    return iteration;
+}
 
-  // 重置函数
-  function reset() {
-    xMin = new BigNumber(-2);
-    xMax = new BigNumber(1);
-    yMin = new BigNumber(-1.5);
-    yMax = new BigNumber(1.5);
-    zoomLevel = 1;
-    draw();
-  }
+// 坐标映射函数
+function mapToReal(x, width, centerX, zoom) {
+    return (x - width/2) / (width/4) / zoom + centerX;
+}
 
-  // 导航抽屉控制
-  function toggleDrawer() {
+function mapToImaginary(y, height, centerY, zoom) {
+    return (y - height/2) / (height/4) / zoom + centerY;
+}
+
+// 设置像素颜色
+function setPixel(imageData, x, y, iteration, maxIter) {
+    let index = (x + y * canvas.width) * 4;
+    
+    if (iteration === maxIter) {
+        imageData.data[index] = 0;
+        imageData.data[index + 1] = 0;
+        imageData.data[index + 2] = 0;
+    } else {
+        let hue = (iteration / maxIter) * 360;
+        let [r, g, b] = hslToRgb(hue/360, 1, 0.5);
+        imageData.data[index] = r;
+        imageData.data[index + 1] = g;
+        imageData.data[index + 2] = b;
+    }
+    imageData.data[index + 3] = 255;
+}
+
+// HSL转RGB
+function hslToRgb(h, s, l) {
+    let r, g, b;
+
+    if (s === 0) {
+        r = g = b = l;
+    } else {
+        function hue2rgb(p, q, t) {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1/6) return p + (q - p) * 6 * t;
+            if (t < 1/2) return q;
+            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        }
+
+        let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        let p = 2 * l - q;
+        
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+// 事件处理函数
+function handleMouseDown(e) {
+    isDragging = true;
+    startX = e.offsetX;
+    startY = e.offsetY;
+}
+
+function handleMouseMove(e) {
+    if (!isDragging) return;
+    
+    let dx = e.offsetX - startX;
+    let dy = e.offsetY - startY;
+    
+    currentX -= dx / (canvas.width/4) / zoomLevel;
+    currentY -= dy / (canvas.height/4) / zoomLevel;
+    
+    startX = e.offsetX;
+    startY = e.offsetY;
+    
+    render();
+}
+
+function handleMouseUp() {
+    isDragging = false;
+}
+
+function handleWheel(e) {
+    e.preventDefault();
+    
+    let zoomFactor = parseFloat(document.getElementById('zoomFactor').value);
+    if (e.deltaY < 0) {
+        zoomLevel *= zoomFactor;
+    } else {
+        zoomLevel /= zoomFactor;
+    }
+    
+    render();
+}
+
+// 触摸事件处理
+function handleTouchStart(e) {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+        isDragging = true;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    }
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (!isDragging) return;
+    
+    let dx = e.touches[0].clientX - startX;
+    let dy = e.touches[0].clientY - startY;
+    
+    currentX -= dx / (canvas.width/4) / zoomLevel;
+    currentY -= dy / (canvas.height/4) / zoomLevel;
+    
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    
+    render();
+}
+
+function handleTouchEnd(e) {
+    e.preventDefault();
+    isDragging = false;
+}
+
+// 控制面板事件处理
+function handleModeChange() {
+    render();
+}
+
+function handleZoomFactorChange() {
+    // 仅更新状态，不需要重新渲染
+    updateStatus();
+}
+
+function handleIterationChange() {
+    render();
+}
+
+function handlePrecisionChange() {
+    render();
+}
+
+// 导航抽屉控制
+function toggleDrawer() {
     const drawer = document.getElementById('navDrawer');
     drawer.classList.toggle('open');
-  }
+}
 
-  // 全屏控制
-  function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  }
+// 页面切换
+function switchPage(pageId) {
+    document.querySelectorAll('.page-content').forEach(page => {
+        page.classList.remove('active');
+    });
+    document.getElementById(pageId).classList.add('active');
+    toggleDrawer();
+}
 
-  // 事件监听器设置
-  canvas.addEventListener('click', zoom);
-  canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    zoom(e);
-  });
+// 重置视图
+function reset() {
+    currentX = -0.5;
+    currentY = 0;
+    zoomLevel = 1;
+    render();
+}
 
-  // UI控件事件监听
-  document.getElementById('precisionControl').addEventListener('change', updatePrecisionControl);
-  document.getElementById('calculationMode').addEventListener('change', updateCalculationMode);
-  document.getElementById('iterInput').addEventListener('change', updateIterations);
-  document.getElementById('zoomFactor').addEventListener('change', updateZoomFactor);
+// 缩小
+function zoomOut() {
+    zoomLevel /= parseFloat(document.getElementById('zoomFactor').value);
+    render();
+}
 
-  // 初始绘制
-  draw();
+// 更新状态显示
+function updateStatus() {
+    document.getElementById('zoomLevel').textContent = zoomLevel.toFixed(2) + 'x';
+    document.getElementById('centerCoord').textContent = `(${currentX.toFixed(6)}, ${currentY.toFixed(6)})`;
+    document.getElementById('precision').textContent = 
+        document.getElementById('calculationMode').value === 'precision' ? '高精度' : '标准';
+    document.getElementById('currentMode').textContent = 
+        document.getElementById('calculationMode').value === 'precision' ? '高精度模式' : '标准模式';
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', initialize);
+
+// 为导航栏链接添加事件监听
+document.querySelectorAll('.nav-drawer a').forEach(link => {
+    link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const pageId = link.getAttribute('href').substring(1) + 'View';
+        switchPage(pageId);
+    });
+});
