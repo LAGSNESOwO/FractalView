@@ -75,26 +75,12 @@ main {
     font-size: 18px;
 }
 
-.button {
-    background-color: var(--dynamic-color-secondary);
-    color: var(--dynamic-color-on-secondary);
-    border: none;
-    border-radius: 16px;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-size: 14px;
-    margin-top: 12px;
-}
-
-.danger-button {
-    background-color: var(--dynamic-color-danger);
-    color: #FFFFFF;
-    border: none;
-    border-radius: 16px;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-size: 14px;
-    margin-top: 12px;
+.card canvas {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    display: block;
+    border-radius: 8px;
 }
 
 .text-field {
@@ -106,50 +92,6 @@ main {
     font-size: 14px;
     outline: none;
     display: block;
-}
-
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    justify-content: center;
-    align-items: center;
-}
-
-.modal-content {
-    background-color: var(--dynamic-color-surface);
-    padding: 16px;
-    border-radius: 16px;
-    width: 90%;
-    max-width: 300px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    font-size: 14px;
-}
-
-.modal-content .button-group {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 16px;
-}
-
-.modal-content button {
-    width: calc(50% - 8px);
-    padding: 8px;
-    background-color: var(--dynamic-color-secondary);
-    color: var(--dynamic-color-on-secondary);
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
-    cursor: pointer;
-}
-
-.modal-content .delete-button {
-    background-color: var(--dynamic-color-danger);
-    color: white;
 }
 
 .nav-drawer {
@@ -173,11 +115,18 @@ main {
 .nav-drawer ul {
     list-style-type: none;
     padding: 0;
+    margin: 0;
 }
 
 .nav-drawer ul li {
     padding: 16px;
     border-bottom: 1px solid var(--dynamic-color-background);
+}
+
+.nav-drawer ul li a {
+    color: var(--dynamic-color-on-surface);
+    text-decoration: none;
+    display: block;
 }
 
 .nav-drawer .close-button {
@@ -273,6 +222,7 @@ input:checked + .slider:before {
 
 .range-input {
     width: 100%;
+    margin: 8px 0;
 }
 
 .page-content {
@@ -308,12 +258,5 @@ input:checked + .slider:before {
         max-width: 600px;
         margin-left: auto;
         margin-right: auto;
-    }
-
-    header button#openModalButton {
-        position: fixed;
-        right: 100px;
-        top: 16px;
-        z-index: 1001;
     }
 }
