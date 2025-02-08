@@ -1,0 +1,319 @@
+:root {
+    --dynamic-color-primary: #6200EE;
+    --dynamic-color-secondary: #03DAC6;
+    --dynamic-color-background: #F5F5F5;
+    --dynamic-color-surface: #FFFFFF;
+    --dynamic-color-on-primary: #FFFFFF;
+    --dynamic-color-on-secondary: #000000;
+    --dynamic-color-on-background: #000000;
+    --dynamic-color-on-surface: #000000;
+    --dynamic-color-danger: #FF0000;
+}
+
+body {
+    margin: 0;
+    font-family: 'Google Sans', sans-serif;
+    font-size: 14px;
+    background-color: var(--dynamic-color-background);
+    color: var(--dynamic-color-on-background);
+}
+
+header {
+    background-color: var(--dynamic-color-primary);
+    color: var(--dynamic-color-on-primary);
+    padding: 12px;
+    font-size: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.header-title {
+    flex-grow: 1;
+    text-align: center;
+    margin: 0;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 18px;
+}
+
+header button {
+    background-color: var(--dynamic-color-secondary);
+    color: var(--dynamic-color-on-secondary);
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+}
+
+main {
+    padding: 12px;
+    padding-bottom: 60px;
+}
+
+.card {
+    background-color: var(--dynamic-color-surface);
+    color: var(--dynamic-color-on-surface);
+    border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 16px;
+    padding: 12px;
+    position: relative;
+    font-size: 14px;
+}
+
+.card h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.button {
+    background-color: var(--dynamic-color-secondary);
+    color: var(--dynamic-color-on-secondary);
+    border: none;
+    border-radius: 16px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 12px;
+}
+
+.danger-button {
+    background-color: var(--dynamic-color-danger);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 16px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 12px;
+}
+
+.text-field {
+    width: calc(100% - 16px);
+    padding: 8px;
+    margin-top: 8px;
+    border: 1px solid var(--dynamic-color-secondary);
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    display: block;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: var(--dynamic-color-surface);
+    padding: 16px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 300px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    font-size: 14px;
+}
+
+.modal-content .button-group {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+}
+
+.modal-content button {
+    width: calc(50% - 8px);
+    padding: 8px;
+    background-color: var(--dynamic-color-secondary);
+    color: var(--dynamic-color-on-secondary);
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.modal-content .delete-button {
+    background-color: var(--dynamic-color-danger);
+    color: white;
+}
+
+.nav-drawer {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 250px;
+    height: 100%;
+    background-color: var(--dynamic-color-surface);
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    padding-top: 60px;
+    transition: transform 0.3s ease-in-out;
+    z-index: 1000;
+}
+
+.nav-drawer.open {
+    display: block;
+}
+
+.nav-drawer ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.nav-drawer ul li {
+    padding: 16px;
+    border-bottom: 1px solid var(--dynamic-color-background);
+}
+
+.nav-drawer .close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: var(--dynamic-color-secondary);
+    color: var(--dynamic-color-on-secondary);
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.footer-nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background-color: var(--dynamic-color-primary);
+    color: var(--dynamic-color-on-primary);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 10px 0;
+}
+
+.footer-nav button {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.footer-nav button span {
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 34px;
+    height: 20px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--dynamic-color-secondary);
+    border-radius: 34px;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 4px;
+    bottom: 4px;
+    background-color: var(--dynamic-color-on-secondary);
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--dynamic-color-primary);
+}
+
+input:checked + .slider:before {
+    transform: translateX(14px);
+}
+
+.range-input {
+    width: 100%;
+}
+
+.page-content {
+    display: none;
+}
+
+.page-content.active {
+    display: block;
+}
+
+@media (min-width: 768px) {
+    .footer-nav {
+        position: fixed;
+        bottom: auto;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 80px;
+        flex-direction: column;
+        justify-content: flex-start;
+        padding-top: 20px;
+    }
+
+    .footer-nav button {
+        margin-bottom: 20px;
+    }
+
+    main {
+        padding-right: 100px;
+    }
+
+    .card {
+        max-width: 600px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    header button#openModalButton {
+        position: fixed;
+        right: 100px;
+        top: 16px;
+        z-index: 1001;
+    }
+}
