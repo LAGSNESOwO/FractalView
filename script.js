@@ -1,48 +1,124 @@
-// 全局变量
-let canvas = document.getElementById('mandelbrot');
-let ctx = canvas.getContext('2d');
-let isDragging = false;
-let startX = 0;
-let startY = 0;
-let currentX = -0.5;
-let currentY = 0;
-let zoomLevel = 1;
-let imageData;
+// script.js
+document.addEventListener('DOMContentLoaded', initialize);
 
-// 初始化设置
+// 全局变量
+let canvas, ctx;
+let currentX = 0, currentY = 0;
+let zoomLevel = 1;
+let isDragging = false;
+let startX, startY;
+let worker = null;
+let workerBusy = false;
+
+// 初始化
 function initialize() {
+    canvas = document.getElementById('mandelbrotCanvas');
+    ctx = canvas.getContext('2d');
+    
     // 设置画布大小
     canvas.width = 800;
-    canvas.height = 600;
+    canvas.height = 500;
     
     // 添加事件监听器
-    setupEventListeners();
+    document.getElementById('iterInput').addEventListener('input', handleIterChange);
+    document.getElementById('colorScheme').addEventListener('change', render);
+    document.getElementById('calculationMode').addEventListener('change', handleModeChange);
+    document.getElementById('precisionControl').addEventListener('change', handlePrecisionChange);
+    document.getElementById('resetView').addEventListener('click', resetView);
     
-    // 初始渲染
-    render();
-    
-    // 更新状态显示
-    updateStatus();
-}
-
-// 设置事件监听器
-function setupEventListeners() {
-    // 鼠标事件
+    // 设置鼠标事件
     canvas.addEventListener('mousedown', handleMouseDown);
     canvas.addEventListener('mousemove', handleMouseMove);
     canvas.addEventListener('mouseup', handleMouseUp);
     canvas.addEventListener('wheel', handleWheel);
     
-    // 触摸事件
-    canvas.addEventListener('touchstart', handleTouchStart);
-    canvas.addEventListener('touchmove', handleTouchMove);
+    // 设置触摸事件
+    canvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+    canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
     canvas.addEventListener('touchend', handleTouchEnd);
     
-    // 控制面板事件
-    document.getElementById('calculationMode').addEventListener('change', handleModeChange);
-    document.getElementById('zoomFactor').addEventListener('change', handleZoomFactorChange);
-    document.getElementById('iterInput').addEventListener('change', handleIterationChange);
-    document.getElementById('precisionControl').addEventListener('change', handlePrecisionChange);
+    // 设置导航控制按钮
+    setupControlButtons();
+    
+    // 初始渲染
+    render();
+}
+
+// 设置导航控制按钮
+function setupControlButtons() {
+    document.getElementById('moveUp').addEventListener('click', () => {
+        currentY -= 0.1 / zoomLevel;
+        render();
+    });
+    
+    document.getElementById('moveDown').addEventListener('click', () => {
+        currentY += 0.1 / zoomLevel;
+        render();
+    });
+    
+    document.getElementById('moveLeft').addEventListener('click', () => {
+        currentX -= 0.1 / zoomLevel;
+        render();
+    });
+    
+    document.getElementById('moveRight').addEventListener('click', () => {
+        currentX += 0.1 / zoomLevel;
+        render();
+    });
+    
+    document.getElementById('zoomIn').addEventListener('click', () => {
+        zoomLevel *= 1.5;
+        render();
+    });
+    
+    document.getElementById('zoomOut').addEventListener('click', () => {
+        zoomLevel /= 1.5;
+        render();
+    });
+}
+
+// 处理迭代值改变
+function handleIterChange() {
+    const iterInput = document.getElementById('iterInput');
+    document.getElementById('iterValue').textContent = iterInput.value;
+    render();
+}
+
+// 处理精度模式改变
+function handleModeChange() {
+    const mode = document.getElementById('calculationMode').value;
+    const precisionControl = document.getElementById('precisionControl');
+    
+    if (mode === 'precision') {
+        precisionControl.disabled = false;
+    } else {
+        precisionControl.disabled = true;
+    }
+    
+    render();
+    updateStatus();
+}
+
+// 处理精度值改变
+function handlePrecisionChange() {
+    const precisionInput = document.getElementById('precisionControl');
+    document.getElementById('precisionValue').textContent = precisionInput.value;
+    render();
+}
+
+// 重置视图
+function resetView() {
+    currentX = 0;
+    currentY = 0;
+    zoomLevel = 1;
+    document.getElementById('iterInput').value = 100;
+    document.getElementById('iterValue').textContent = 100;
+    document.getElementById('colorScheme').value = 'classic';
+    document.getElementById('calculationMode').value = 'standard';
+    document.getElementById('precisionControl').value = 0;
+    document.getElementById('precisionValue').textContent = 0;
+    handleModeChange();
+    render();
 }
 
 // 渲染曼德博集合
@@ -50,133 +126,191 @@ function render() {
     const maxIter = parseInt(document.getElementById('iterInput').value);
     const isPrecisionMode = document.getElementById('calculationMode').value === 'precision';
     
-    imageData = ctx.createImageData(canvas.width, canvas.height);
+    // 如果是高精度模式，使用Web Worker
+    if (isPrecisionMode) {
+        // 如果Worker正在运行，则终止
+        if (worker && workerBusy) {
+            worker.terminate();
+            worker = null;
+        }
+        
+        renderWithWorker(maxIter);
+    } else {
+        // 标准模式使用主线程渲染
+        renderStandard(maxIter);
+    }
     
-    for(let x = 0; x < canvas.width; x++) {
-        for(let y = 0; y < canvas.height; y++) {
-            let zx = mapToReal(x, canvas.width, currentX, zoomLevel);
-            let zy = mapToImaginary(y, canvas.height, currentY, zoomLevel);
+    updateStatus();
+}
+
+// 使用Worker进行高精度渲染
+function renderWithWorker(maxIter) {
+    showLoadingIndicator();
+    
+    // 创建新的Worker
+    if (!worker) {
+        worker = new Worker('mandelbrot-worker.js');
+        
+        worker.onmessage = function(e) {
+            const imageData = new ImageData(
+                new Uint8ClampedArray(e.data.buffer), 
+                canvas.width, 
+                canvas.height
+            );
             
-            let iteration = calculatePoint(zx, zy, maxIter, isPrecisionMode);
+            ctx.putImageData(imageData, 0, 0);
+            hideLoadingIndicator();
+            workerBusy = false;
+        };
+    }
+    
+    // 发送数据给Worker
+    const precisionValue = parseInt(document.getElementById('precisionControl').value);
+    const colorScheme = document.getElementById('colorScheme').value;
+    
+    workerBusy = true;
+    worker.postMessage({
+        width: canvas.width,
+        height: canvas.height,
+        currentX: currentX,
+        currentY: currentY,
+        zoomLevel: zoomLevel,
+        maxIter: maxIter,
+        precision: precisionValue,
+        colorScheme: colorScheme
+    });
+}
+
+// 标准模式渲染（主线程）
+function renderStandard(maxIter) {
+    const width = canvas.width;
+    const height = canvas.height;
+    const imageData = ctx.createImageData(width, height);
+    const data = imageData.data;
+    const colorScheme = document.getElementById('colorScheme').value;
+    
+    for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+            // 将canvas坐标转换到复平面坐标
+            const zx = (x - width / 2) / (0.25 * width * zoomLevel) + currentX;
+            const zy = (y - height / 2) / (0.25 * height * zoomLevel) + currentY;
             
-            setPixel(imageData, x, y, iteration, maxIter);
+            // 计算该点的迭代次数
+            const iteration = calculatePoint(zx, zy, maxIter, false);
+            
+            // 根据迭代次数上色
+            const color = getColor(iteration, maxIter, colorScheme);
+            
+            // 设置像素颜色
+            const pixelIndex = (y * width + x) * 4;
+            data[pixelIndex] = color.r;     // 红
+            data[pixelIndex + 1] = color.g; // 绿
+            data[pixelIndex + 2] = color.b; // 蓝
+            data[pixelIndex + 3] = 255;     // 透明度
         }
     }
     
     ctx.putImageData(imageData, 0, 0);
-    updateStatus();
 }
 
-// 计算单个点
-function calculatePoint(x0, y0, maxIter, isPrecisionMode) {
-    if (isPrecisionMode) {
-        return calculatePointPrecision(x0, y0, maxIter);
-    }
-    
+// 计算一个点的迭代次数（标准精度）
+function calculatePoint(x0, y0, maxIter, isPrecision) {
+    // 标准精度模式使用普通JavaScript数学运算
     let x = 0;
     let y = 0;
     let iteration = 0;
+    let x2 = 0;
+    let y2 = 0;
     
-    while (x*x + y*y <= 4 && iteration < maxIter) {
-        let xtemp = x*x - y*y + x0;
-        y = 2*x*y + y0;
-        x = xtemp;
+    while (x2 + y2 < 4 && iteration < maxIter) {
+        y = 2 * x * y + y0;
+        x = x2 - y2 + x0;
+        x2 = x * x;
+        y2 = y * y;
         iteration++;
     }
     
     return iteration;
 }
 
-// 高精度计算
-function calculatePointPrecision(x0, y0, maxIter) {
-    let x = new BigNumber(0);
-    let y = new BigNumber(0);
-    let x0Big = new BigNumber(x0);
-    let y0Big = new BigNumber(y0);
-    let iteration = 0;
-    
-    while (x.times(x).plus(y.times(y)).lte(4) && iteration < maxIter) {
-        let xtemp = x.times(x).minus(y.times(y)).plus(x0Big);
-        y = x.times(y).times(2).plus(y0Big);
-        x = xtemp;
-        iteration++;
-    }
-    
-    return iteration;
-}
-
-// 坐标映射函数
-function mapToReal(x, width, centerX, zoom) {
-    return (x - width/2) / (width/4) / zoom + centerX;
-}
-
-function mapToImaginary(y, height, centerY, zoom) {
-    return (y - height/2) / (height/4) / zoom + centerY;
-}
-
-// 设置像素颜色
-function setPixel(imageData, x, y, iteration, maxIter) {
-    let index = (x + y * canvas.width) * 4;
-    
+// 获取颜色
+function getColor(iteration, maxIter, scheme) {
+    // 如果达到最大迭代次数，返回黑色
     if (iteration === maxIter) {
-        imageData.data[index] = 0;
-        imageData.data[index + 1] = 0;
-        imageData.data[index + 2] = 0;
-    } else {
-        let hue = (iteration / maxIter) * 360;
-        let [r, g, b] = hslToRgb(hue/360, 1, 0.5);
-        imageData.data[index] = r;
-        imageData.data[index + 1] = g;
-        imageData.data[index + 2] = b;
+        return { r: 0, g: 0, b: 0 };
     }
-    imageData.data[index + 3] = 255;
-}
-
-// HSL转RGB
-function hslToRgb(h, s, l) {
+    
+    // 根据不同配色方案计算颜色
     let r, g, b;
-
-    if (s === 0) {
-        r = g = b = l;
-    } else {
-        function hue2rgb(p, q, t) {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1/6) return p + (q - p) * 6 * t;
-            if (t < 1/2) return q;
-            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-            return p;
-        }
-
-        let q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        let p = 2 * l - q;
-        
-        r = hue2rgb(p, q, h + 1/3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1/3);
+    const normalized = iteration / maxIter;
+    const hue = 360 * normalized;
+    
+    switch (scheme) {
+        case 'classic':
+            r = Math.round(255 * Math.sqrt(normalized));
+            g = Math.round(255 * Math.pow(normalized, 3));
+            b = Math.round(255 * Math.sin(normalized * Math.PI));
+            break;
+        case 'fire':
+            r = Math.min(255, Math.round(255 * normalized * 2));
+            g = Math.round(255 * Math.pow(normalized, 2));
+            b = Math.round(50 * normalized);
+            break;
+        case 'ocean':
+            r = Math.round(50 * normalized);
+            g = Math.round(150 * normalized);
+            b = Math.min(255, Math.round(255 * normalized * 1.5));
+            break;
+        case 'rainbow':
+            // HSV到RGB的转换（简化版）
+            const i = Math.floor(hue / 60) % 6;
+            const f = hue / 60 - i;
+            const value = 255;
+            const saturation = 1;
+            const v = value;
+            const p = value * (1 - saturation);
+            const q = value * (1 - f * saturation);
+            const t = value * (1 - (1 - f) * saturation);
+            
+            switch (i) {
+                case 0: r = v; g = t; b = p; break;
+                case 1: r = q; g = v; b = p; break;
+                case 2: r = p; g = v; b = t; break;
+                case 3: r = p; g = q; b = v; break;
+                case 4: r = t; g = p; b = v; break;
+                case 5: r = v; g = p; b = q; break;
+            }
+            
+            r = Math.round(r);
+            g = Math.round(g);
+            b = Math.round(b);
+            break;
+        default:
+            r = g = b = Math.round(255 * normalized);
     }
-
-    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    
+    return { r, g, b };
 }
 
-// 事件处理函数
+// 鼠标事件处理
 function handleMouseDown(e) {
     isDragging = true;
-    startX = e.offsetX;
-    startY = e.offsetY;
+    startX = e.clientX;
+    startY = e.clientY;
 }
 
 function handleMouseMove(e) {
     if (!isDragging) return;
     
-    let dx = e.offsetX - startX;
-    let dy = e.offsetY - startY;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
     
-    currentX -= dx / (canvas.width/4) / zoomLevel;
-    currentY -= dy / (canvas.height/4) / zoomLevel;
+    // 移动视图中心
+    currentX -= dx / (0.25 * canvas.width * zoomLevel);
+    currentY -= dy / (0.25 * canvas.height * zoomLevel);
     
-    startX = e.offsetX;
-    startY = e.offsetY;
+    startX = e.clientX;
+    startY = e.clientY;
     
     render();
 }
@@ -185,15 +319,29 @@ function handleMouseUp() {
     isDragging = false;
 }
 
+// 鼠标滚轮事件处理（缩放）
 function handleWheel(e) {
     e.preventDefault();
     
-    let zoomFactor = parseFloat(document.getElementById('zoomFactor').value);
+    // 获取鼠标在canvas中的位置
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // 将鼠标坐标转换为复平面坐标
+    const complexX = (mouseX - canvas.width / 2) / (0.25 * canvas.width * zoomLevel) + currentX;
+    const complexY = (mouseY - canvas.height / 2) / (0.25 * canvas.height * zoomLevel) + currentY;
+    
+    // 根据滚轮方向调整缩放级别
     if (e.deltaY < 0) {
-        zoomLevel *= zoomFactor;
+        zoomLevel *= 1.1; // 放大
     } else {
-        zoomLevel /= zoomFactor;
+        zoomLevel /= 1.1; // 缩小
     }
+    
+    // 调整当前中心，使鼠标位置保持不变
+    currentX = complexX - (mouseX - canvas.width / 2) / (0.25 * canvas.width * zoomLevel);
+    currentY = complexY - (mouseY - canvas.height / 2) / (0.25 * canvas.height * zoomLevel);
     
     render();
 }
@@ -212,11 +360,11 @@ function handleTouchMove(e) {
     e.preventDefault();
     if (!isDragging) return;
     
-    let dx = e.touches[0].clientX - startX;
-    let dy = e.touches[0].clientY - startY;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
     
-    currentX -= dx / (canvas.width/4) / zoomLevel;
-    currentY -= dy / (canvas.height/4) / zoomLevel;
+    currentX -= dx / (0.25 * canvas.width * zoomLevel);
+    currentY -= dy / (0.25 * canvas.height * zoomLevel);
     
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
@@ -224,76 +372,31 @@ function handleTouchMove(e) {
     render();
 }
 
-function handleTouchEnd(e) {
-    e.preventDefault();
+function handleTouchEnd() {
     isDragging = false;
-}
-
-// 控制面板事件处理
-function handleModeChange() {
-    render();
-}
-
-function handleZoomFactorChange() {
-    // 仅更新状态，不需要重新渲染
-    updateStatus();
-}
-
-function handleIterationChange() {
-    render();
-}
-
-function handlePrecisionChange() {
-    render();
-}
-
-// 导航抽屉控制
-function toggleDrawer() {
-    const drawer = document.getElementById('navDrawer');
-    drawer.classList.toggle('open');
-}
-
-// 页面切换
-function switchPage(pageId) {
-    document.querySelectorAll('.page-content').forEach(page => {
-        page.classList.remove('active');
-    });
-    document.getElementById(pageId).classList.add('active');
-    toggleDrawer();
-}
-
-// 重置视图
-function reset() {
-    currentX = -0.5;
-    currentY = 0;
-    zoomLevel = 1;
-    render();
-}
-
-// 缩小
-function zoomOut() {
-    zoomLevel /= parseFloat(document.getElementById('zoomFactor').value);
-    render();
 }
 
 // 更新状态显示
 function updateStatus() {
     document.getElementById('zoomLevel').textContent = zoomLevel.toFixed(2) + 'x';
     document.getElementById('centerCoord').textContent = `(${currentX.toFixed(6)}, ${currentY.toFixed(6)})`;
-    document.getElementById('precision').textContent = 
-        document.getElementById('calculationMode').value === 'precision' ? '高精度' : '标准';
-    document.getElementById('currentMode').textContent = 
-        document.getElementById('calculationMode').value === 'precision' ? '高精度模式' : '标准模式';
+    document.getElementById('precision').textContent = document.getElementById('calculationMode').value === 'precision' ? '高精度' : '标准';
+    document.getElementById('currentMode').textContent = document.getElementById('calculationMode').value === 'precision' ? '高精度模式' : '标准模式';
 }
 
-// 页面加载完成后初始化
-document.addEventListener('DOMContentLoaded', initialize);
+// 显示和隐藏加载指示器
+function showLoadingIndicator() {
+    const status = document.getElementById('renderStatus');
+    status.style.display = 'block';
+    status.textContent = '计算中...';
+}
 
-// 为导航栏链接添加事件监听
-document.querySelectorAll('.nav-drawer a').forEach(link => {
-    link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const pageId = link.getAttribute('href').substring(1) + 'View';
-        switchPage(pageId);
-    });
-});
+function hideLoadingIndicator() {
+    const status = document.getElementById('renderStatus');
+    status.textContent = '渲染完成';
+    
+    // 2秒后隐藏
+    setTimeout(() => {
+        status.style.display = 'none';
+    }, 2000);
+}

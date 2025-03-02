@@ -1,110 +1,111 @@
+<!-- index.html -->
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FractalView Precision</title>
-  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/bignumber.js/9.1.1/bignumber.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>曼德博集合探索器</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
 </head>
 <body>
-  <header>
-    <button id="menuButton" onclick="toggleDrawer()">
-      <span class="material-icons">menu</span>
-    </button>
-    <h1 class="header-title">FractalView Precision</h1>
-  </header>
+    <div class="container">
+        <header>
+            <h1>曼德博集合探索器</h1>
+            <p>通过鼠标操作探索数学之美</p>
+        </header>
 
-  <div class="nav-drawer" id="navDrawer">
-    <button class="close-button" onclick="toggleDrawer()">
-      <span class="material-icons">close</span>
-    </button>
-    <ul>
-      <li><a href="#main">首页</a></li>
-      <li><a href="#about">关于</a></li>
-    </ul>
-  </div>
+        <main>
+            <div class="card">
+                <h2>实时预览</h2>
+                <div class="preview-container">
+                    <canvas id="mandelbrotCanvas"></canvas>
+                    <div id="renderStatus" class="render-status">计算中...</div>
+                </div>
+            </div>
 
-  <main>
-    <div class="page-content active" id="mainView">
-      <div class="card">
-        <h2>控制面板</h2>
-        <div style="margin-top: 16px;">
-          <label>计算模式:</label>
-          <select id="calculationMode" class="text-field">
-            <option value="normal">标准模式</option>
-            <option value="precision">高精度模式</option>
-          </select>
-        </div>
+            <!-- 导航控制卡片 -->
+            <div class="card control-card">
+                <div class="control-buttons">
+                    <button id="moveUp" title="向上移动">↑</button>
+                    <button id="moveDown" title="向下移动">↓</button>
+                    <button id="moveLeft" title="向左移动">←</button>
+                    <button id="moveRight" title="向右移动">→</button>
+                    <button id="zoomIn" title="放大">🔍+</button>
+                    <button id="zoomOut" title="缩小">🔍-</button>
+                </div>
+            </div>
 
-        <div style="margin-top: 16px;">
-          <label>缩放倍率:</label>
-          <select id="zoomFactor" class="text-field">
-            <option value="1.5">1.5x</option>
-            <option value="2" selected>2x</option>
-            <option value="3">3x</option>
-            <option value="4">4x</option>
-            <option value="5">5x</option>
-          </select>
-        </div>
+            <div class="dashboard">
+                <div class="card settings-card">
+                    <h2>设置</h2>
+                    <div class="settings-container">
+                        <div class="setting-row">
+                            <label for="iterInput">最大迭代次数:</label>
+                            <input type="range" id="iterInput" min="50" max="1000" value="100" step="50">
+                            <span id="iterValue">100</span>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <label for="colorScheme">配色方案:</label>
+                            <select id="colorScheme">
+                                <option value="classic">经典</option>
+                                <option value="fire">火焰</option>
+                                <option value="ocean">海洋</option>
+                                <option value="rainbow">彩虹</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <label for="calculationMode">计算模式:</label>
+                            <select id="calculationMode">
+                                <option value="standard">标准模式</option>
+                                <option value="precision">高精度模式</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <label for="precisionControl">数值精度:</label>
+                            <input type="range" id="precisionControl" min="0" max="64" value="0" step="8">
+                            <span id="precisionValue">0</span>
+                        </div>
+                        
+                        <button id="resetView" class="action-button">重置视图</button>
+                    </div>
+                </div>
 
-        <div style="margin-top: 16px;">
-          <label>迭代次数: <span id="iterValue">100</span></label>
-          <input type="range" id="iterInput" class="range-input" 
-                 min="1" max="1000" value="100" 
-                 oninput="document.getElementById('iterValue').textContent = this.value">
-        </div>
+                <div class="card info-card">
+                    <h2>信息</h2>
+                    <div class="info-container">
+                        <div class="info-row">
+                            <span class="info-label">缩放:</span>
+                            <span id="zoomLevel" class="info-value">1.00x</span>
+                        </div>
+                        
+                        <div class="info-row">
+                            <span class="info-label">中心坐标:</span>
+                            <span id="centerCoord" class="info-value">(0.000000, 0.000000)</span>
+                        </div>
+                        
+                        <div class="info-row">
+                            <span class="info-label">计算模式:</span>
+                            <span id="currentMode" class="info-value">标准模式</span>
+                        </div>
+                        
+                        <div class="info-row">
+                            <span class="info-label">精度:</span>
+                            <span id="precision" class="info-value">标准</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
 
-        <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center;">
-          <label>精度控制</label>
-          <label class="switch">
-            <input type="checkbox" id="precisionControl" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <div class="card">
-        <canvas id="mandelbrot"></canvas>
-      </div>
-
-      <div class="card">
-        <h2>状态信息</h2>
-        <div style="margin-top: 8px;">当前缩放级别: <span id="zoomLevel">1x</span></div>
-        <div>中心坐标: <span id="centerCoord">(0, 0)</span></div>
-        <div>数值精度: <span id="precision">0</span></div>
-        <div>计算模式: <span id="currentMode">标准模式</span></div>
-      </div>
+        <footer>
+            <p>使用鼠标拖动移动视图，滚轮缩放。在移动设备上可使用手指操作。</p>
+        </footer>
     </div>
 
-    <div class="page-content" id="aboutView">
-      <div class="card">
-        <h2>FractalView</h2>
-        <p>By LAGSNES</p>
-        <p><a href="https://github.com/LAGSNESOwO/FractalView">GitHub</a></p>
-        
-        <h2>永久链接</h2>
-        <ul>
-          <li><a href="https://lagsnesowo.github.io/FractalView/">GitHub Pages</a></li>
-          <li><a href="https://FractalView.pages.dev">Cloudflare Pages</a></li>
-        </ul>
-      </div>
-    </div>
-  </main>
-
-  <div class="footer-nav">
-    <button onclick="reset()">
-      <span class="material-icons">refresh</span>
-      <span>重置</span>
-    </button>
-    <button onclick="zoomOut()">
-      <span class="material-icons">zoom_out</span>
-      <span>缩小</span>
-    </button>
-  </div>
-
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
